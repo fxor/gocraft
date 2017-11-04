@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"io"
 	"log"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -38,10 +36,6 @@ type PongPacket struct {
 	Payload int64
 }
 
-func (PongPacket) GetId() int {
-	return 1
-}
-
 var ExampleJson = `
 {
     "version": {
@@ -60,25 +54,6 @@ var ExampleJson = `
 `
 
 type StatusResponse struct{}
-
-type Packet interface {
-	GetId() int
-}
-
-func WritePacket(w io.Writer, p Packet) error {
-	var b bytes.Buffer
-	_, err := Write(&b, VarInt(p.GetId()))
-	if err != nil {
-		log.Println(err)
-	}
-	_, err = Write(w, p)
-	if err != nil {
-		log.Println(err)
-	}
-	Write(w, VarInt(b.Len()))
-	_, err = io.Copy(w, &b)
-	return errors.Wrap(err, "Can't write data to conn")
-}
 
 func ReadRawPacket(r io.Reader) (p RawPacket, err error) {
 	length, _, err := ReadVarInt(r)

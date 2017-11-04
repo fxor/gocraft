@@ -7,7 +7,7 @@ import (
 	_ "testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/zaluska/gocraft/protocol"
+	"github.com/rzaluska/gocraft/protocol"
 )
 
 type ByteConn struct {
@@ -68,10 +68,17 @@ func main() {
 					}
 				}
 			case *protocol.PingPacket:
-				pong := protocol.PongPacket{}
-				pong.Payload = p.Payload
-
-				err := protocol.WritePacket(conn, pong)
+				l := protocol.SizeOfSerializedData(protocol.VarInt(1))
+				l += protocol.SizeOfSerializedData(p.Payload)
+				_, err := protocol.Write(conn, protocol.VarInt(l))
+				if err != nil {
+					log.Println(err)
+				}
+				_, err = protocol.Write(conn, protocol.VarInt(1))
+				if err != nil {
+					log.Println(err)
+				}
+				_, err = protocol.Write(conn, p.Payload)
 				if err != nil {
 					log.Println(err)
 				}
