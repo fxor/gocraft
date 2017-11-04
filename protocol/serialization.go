@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"reflect"
 
@@ -65,9 +64,52 @@ func Read(r io.Reader, v interface{}) (n uint, err error) {
 			}
 			return n, nil
 		} else {
-			return 0, fmt.Errorf("Data type %T not supported", v)
+			return 0, errors.Errorf("Data type %T not supported for reading", v)
 		}
 	}
+}
+
+func Write(w io.Writer, v interface{}) (n int, err error) {
+	switch v := v.(type) {
+	case VarInt:
+		n, err = writeVarNumber(w, int64(v), 5)
+	case VarLong:
+		n, err = writeVarNumber(w, int64(v), 10)
+	case int64:
+		b := make([]byte, 8)
+		binary.BigEndian.PutUint64(b, uint64(v))
+		n, err = w.Write(b)
+		if err != nil {
+			return 0, errors.Wrapf(err, "Can't write in64 %d", v)
+		}
+	case string:
+		vl, err := writeVarNumber(w, int64(len(v)), 5)
+		if err != nil {
+			return 0, errors.Wrapf(err, "Can't write string %s len", v)
+		}
+		b := []byte(v)
+		_, err = w.Write(b)
+		if err != nil {
+			return 0, errors.Wrapf(err, "Can't write string %s bytes", v)
+		}
+		return vl + len(v), nil
+	default:
+		e := reflect.ValueOf(v)
+		if e.Kind() == reflect.Struct {
+			for i := 0; i < e.NumField(); i++ {
+				field := e.Field(i)
+				m, err := Write(w, field.Interface())
+				if err != nil {
+					return n, err
+				}
+				n += m
+			}
+			return n, nil
+		} else {
+			return 0, errors.Errorf("Data type %T not supported for writting", v)
+		}
+	}
+	return
 }
 
 func readVarNumber(r io.Reader, maxBytes uint) (i int64, n uint, err error) {
@@ -136,33 +178,4 @@ func SizeOfSerializedData(v interface{}) int {
 	nw := NullWritter{}
 	n, _ := Write(nw, v)
 	return n
-
-}
-
-func Write(w io.Writer, v interface{}) (n int, err error) {
-	switch v := v.(type) {
-	case VarInt:
-		n, err = writeVarNumber(w, int64(v), 5)
-	case VarLong:
-		n, err = writeVarNumber(w, int64(v), 10)
-	case int64:
-		b := make([]byte, 8)
-		binary.BigEndian.PutUint64(b, uint64(v))
-		n, err = w.Write(b)
-		if err != nil {
-			return 0, errors.Wrapf(err, "Can't write in64 %d", v)
-		}
-	case string:
-		vl, err := writeVarNumber(w, int64(len(v)), 5)
-		if err != nil {
-			return 0, errors.Wrapf(err, "Can't write string %s len", v)
-		}
-		b := []byte(v)
-		_, err = w.Write(b)
-		if err != nil {
-			return 0, errors.Wrapf(err, "Can't write string %s bytes", v)
-		}
-		return vl + len(v), nil
-	}
-	return
 }
