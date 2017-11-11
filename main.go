@@ -7,7 +7,7 @@ import (
 	_ "testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/rzaluska/gocraft/protocol"
+	"github.com/fxor/gocraft/protocol"
 )
 
 type ByteConn struct {
